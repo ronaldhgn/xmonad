@@ -1,0 +1,13 @@
+Ronald's Xmonad configuration
+
+This configuration is used in Xmonad .9 on Archlinux
+
+* Installation ( http://wiki.archlinux.org/index.php/Xmonad )
+
+    # packer -S xmonad-darcs xmonad-contrib-darcs
+
+* Starting xmonad from ~/.xinitc
+
+    $ xsetroot -cursor_name left_ptr
+    $ feh --bg-scale /home/ronald/bin/tinypilot.jpg &
+    $ exec ck-launch-session xmonad
