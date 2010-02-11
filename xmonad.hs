@@ -1,22 +1,37 @@
 --
+-- ~/.xmonad/xmonad.hs by Ronald Hgn
 --
--- xmonad example config file.
+-- Comments {{{
 --
--- A template showing all available configuration hooks,
--- and how to override the defaults in your own xmonad.hs conf file.
+-- ALSO CHECK:
+--      http://www.haskell.org/haskellwiki/Xmonad/Config_archive/Thomas_ten_Cate%27s_xmonad.hs
+--      http://paste.n-sch.de/xmonad/xmonad_hs.html
 --
--- Normally, you'd only override those defaults you care about.
+-- Navigation:
+-- Mod+1..9         switch to workspace
 --
+-- Window Management:
+--
+-- Layout Management:
+--
+-- 
+-- Other:
+--
+-- }}}
 
+-- Imports {{{
+--
 import XMonad
+
 import Data.Monoid
 import System.Exit
 
 import qualified XMonad.StackSet as W
 import qualified Data.Map        as M
 
--- The preferred terminal program, which is used in a binding below and by
--- certain contrib modules.
+-- }}}
+
+-- Options {{{
 --
 myTerminal      = "terminal"
 
@@ -26,7 +41,7 @@ myFocusFollowsMouse = True
 
 -- Width of the window border in pixels.
 --
-myBorderWidth   = 1
+myBorderWidth   = 2
 
 -- modMask lets you specify which modkey you want to use. The default
 -- is mod1Mask ("left alt").  You may also consider using mod3Mask
@@ -51,8 +66,9 @@ myWorkspaces    = ["1","2","3","4","5","6","7","8","9"]
 myNormalBorderColor  = "#dddddd"
 myFocusedBorderColor = "#ff0000"
 
-------------------------------------------------------------------------
--- Key bindings. Add, modify or remove key bindings here.
+-- }}}
+
+-- Key Bindings {{{
 --
 myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
 
@@ -149,9 +165,9 @@ myKeys conf@(XConfig {XMonad.modMask = modm}) = M.fromList $
         | (key, sc) <- zip [xK_w, xK_e, xK_r] [0..]
         , (f, m) <- [(W.view, 0), (W.shift, shiftMask)]]
 
+-- }}}
 
-------------------------------------------------------------------------
--- Mouse bindings: default actions bound to mouse events
+-- Mouse Bindings {{{
 --
 myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
 
@@ -169,8 +185,9 @@ myMouseBindings (XConfig {XMonad.modMask = modm}) = M.fromList $
     -- you may also bind events to the mouse scroll wheel (button4 and button5)
     ]
 
-------------------------------------------------------------------------
--- Layouts:
+-- }}}
+
+-- Layouts {{{
 
 -- You can specify and transform your layouts by modifying these values.
 -- If you change layout bindings be sure to use 'mod-shift-space' after
@@ -200,8 +217,9 @@ myLayout = tiled ||| Mirror tiled ||| Full
     -- Percent of screen to increment by when resizing panes
     delta   = 3/100
 
-------------------------------------------------------------------------
--- Window rules:
+-- }}}
+
+-- Window rules {{{
 
 -- Execute arbitrary actions and WindowSet manipulations when managing
 -- a new window. You can use this to, for example, always float a
@@ -221,8 +239,9 @@ myManageHook = composeAll
     , resource  =? "desktop_window" --> doIgnore
     , resource  =? "kdesktop"       --> doIgnore ]
 
-------------------------------------------------------------------------
--- Event handling
+-- }}}
+
+-- Event handling {{{
 
 -- Defines a custom handler function for X Events. The function should
 -- return (All True) if the default handler is to be run afterwards. To
@@ -235,8 +254,9 @@ myManageHook = composeAll
 --
 myEventHook = mempty
 
-------------------------------------------------------------------------
--- Status bars and logging
+-- }}}
+
+-- Status bars and logging {{{
 
 -- Perform an arbitrary action on each internal state change or X event.
 -- See the 'XMonad.Hooks.DynamicLog' extension for examples.
@@ -248,8 +268,9 @@ myEventHook = mempty
 --
 myLogHook = return ()
 
-------------------------------------------------------------------------
--- Startup hook
+-- }}}
+
+-- Startup hook {{{
 
 -- Perform an arbitrary action each time xmonad starts or is restarted
 -- with mod-q.  Used by, e.g., XMonad.Layout.PerWorkspace to initialize
@@ -264,37 +285,29 @@ myLogHook = return ()
 --
 myStartupHook = return ()
 
-------------------------------------------------------------------------
--- Now run xmonad with all the defaults we set up.
+-- }}}
 
--- Run xmonad with the settings you specify. No need to modify this.
+-- Main {{{
 --
 main = xmonad defaults
-
--- A structure containing your configuration settings, overriding
--- fields in the default config. Any you don't override, will
--- use the defaults defined in xmonad/XMonad/Config.hs
 --
--- No need to modify this.
---
-defaults = defaultConfig {
-      -- simple stuff
-        terminal           = myTerminal,
-        focusFollowsMouse  = myFocusFollowsMouse,
-        borderWidth        = myBorderWidth,
-        modMask            = myModMask,
-        workspaces         = myWorkspaces,
-        normalBorderColor  = myNormalBorderColor,
-        focusedBorderColor = myFocusedBorderColor,
-
-      -- key bindings
-        keys               = myKeys,
-        mouseBindings      = myMouseBindings,
-
-      -- hooks, layouts
-        layoutHook         = myLayout,
-        manageHook         = myManageHook,
-        handleEventHook    = myEventHook,
-        logHook            = myLogHook,
-        startupHook        = myStartupHook
+defaults = defaultConfig
+    { terminal           = myTerminal
+    , focusFollowsMouse  = myFocusFollowsMouse
+    , borderWidth        = myBorderWidth
+    , modMask            = myModMask
+    , workspaces         = myWorkspaces
+    , normalBorderColor  = myNormalBorderColor
+    , focusedBorderColor = myFocusedBorderColor
+    , keys               = myKeys
+    , mouseBindings      = myMouseBindings
+    , layoutHook         = myLayout
+    , manageHook         = myManageHook
+    , handleEventHook    = myEventHook
+    , logHook            = myLogHook
+    , startupHook        = myStartupHook
     }
+
+-- }}}
+
+-- vim:foldmethod=marker
