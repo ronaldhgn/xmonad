@@ -1,0 +1,469 @@
+--
+-- ~/.xmonad/xmonad.hs by pbrisbin
+--
+-- Last updated: 16 january 2010 
+--
+-- Comments {{{
+--
+-- :: Known to work with:
+--
+--   ghc                 6.10.4
+--   haskell-utf8-string 0.3.5
+--   haskell-x11         1.4.6.1
+--   haskell-x11-xft     0.3
+--   xmonad              0.9
+--   xmonad-contrib      0.9
+--
+-- :: Common mistakes which will make this config not work:
+--
+--   Not having some things installed...
+--     xft-capable dzen2
+--
+--   Not adjusting some user-specific functions...
+--     monitorWidth
+--     myTerminal
+--     conkyFile
+--     myKeys
+--
+-- }}}
+
+-- Imports {{{
+--
+-- i try to import only what i use, therefore if
+-- you make edits, then get out of scope errors,
+-- try removing the parts in parenthesis so you
+-- get the whole module at your disposal in stead
+--
+import XMonad
+
+--import XMonad.Config.Xfce
+
+import XMonad.Actions.CycleWS
+import XMonad.Actions.CycleWindows  (rotFocusedUp, rotFocusedDown)
+import XMonad.Actions.UpdatePointer
+import XMonad.Actions.NoBorders
+
+import XMonad.Hooks.DynamicLog
+import XMonad.Hooks.FadeInactive
+import XMonad.Hooks.ManageHelpers
+import XMonad.Hooks.ManageDocks
+import XMonad.Hooks.UrgencyHook
+
+import XMonad.Layout.IM
+import XMonad.Layout.LayoutHints    (layoutHintsWithPlacement)
+import XMonad.Layout.NoBorders
+import XMonad.Layout.PerWorkspace   (onWorkspace)
+import XMonad.Layout.ResizableTile
+import XMonad.Layout.Tabbed
+import XMonad.Layout.TwoPane
+import XMonad.Layout.SimpleFloat
+import XMonad.Layout.Reflect        (reflectHoriz)
+import XMonad.Layout.Accordion
+
+import XMonad.Util.EZConfig         (additionalKeysP)
+import XMonad.Util.Loggers          (maildirNew,dzenColorL,wrapL)
+import XMonad.Util.Run              (spawnPipe)
+import XMonad.Util.Scratchpad
+import XMonad.Util.WindowProperties (getProp32s)
+import XMonad.Util.WorkspaceCompare (getSortByXineramaRule)
+
+import XMonad.Actions.RotSlaves     (rotSlavesUp)
+
+import Data.List
+import Data.Monoid
+import Data.Ratio
+
+import System.IO
+import System.Exit
+
+import qualified Data.Map        as M
+import qualified XMonad.StackSet as W
+
+-- }}}
+
+-- Main {{{
+--
+main = do
+  d <- spawnPipe myLeftBar -- spawn the left statusbar
+-----  spawn myRightBar         -- spawn the right statusbar
+-----  spawn "conky"            -- spawn a standard conky
+
+  -- and finally start xmonad
+  xmonad $ withUrgencyHook myUrgencyHook $ defaultConfig
+  --xmonad $ withUrgencyHook myUrgencyHook $ xfceConfig
+    { terminal           = myTerminal
+    , workspaces         = myWorkspaces
+    , borderWidth        = myBorderWidth
+    , normalBorderColor  = myNormalBorderColor
+    , focusedBorderColor = myFocusedBorderColor
+    , layoutHook         = myLayout
+    , manageHook         = myManageHook
+    , logHook            = myLogHook d
+    , modMask            = myModMask
+    } `additionalKeysP` myKeys
+
+-- }}}
+
+-- Theme {{{
+--
+-- adjust these variables, they are used throughout
+--
+myXFTFont    = "xft:Verdana-8"   -- see 'Status Bars' for the dzen font
+-----conkyFile    = "~/.dzen_conkyrc" -- populates right status bar
+
+colorBG      = "#303030"         -- background
+colorFG      = "#606060"         -- foreground
+colorFG2     = "#909090"         -- foreground w/ emphasis
+colorFG3     = "#ffffff"         -- foreground w/ strong emphasis
+colorUrg     = "#ffa824"         -- urgent
+
+barHeight    = 0
+monitorWidth = 1280              -- two statusbars will span this width
+leftBarWidth = 1280              -- right bar will span difference
+
+-- }}}
+
+-- Options {{{
+--
+-- you should adjust the terminal
+--
+-- if you change workspace names, be sure to update them throughout
+--
+myTerminal           = "Terminal"
+myWorkspaces         = ["1-main","2-web","3-chat","4-art","5-latex"] ++ map show [6..9]
+myNormalBorderColor  = colorBG
+myFocusedBorderColor = colorFG3
+myBorderWidth        = 2
+
+-- }}}
+
+-- Layouts {{{
+myLayout = avoidStruts $ onWorkspace "4-art" gimpLayout
+                       $ onWorkspace "5-latex" latexLayout
+                       $ standardLayouts
+
+  where
+    
+    standardLayouts = withIM (2/10) imProp $ theLayouts
+    --webLayouts      = tabLayout ||| twoPane ||| full
+    gimpLayout      = withIM (2/10) imProp $ 
+                      withIM (2/10) gimpLeftProp $ reflectHoriz $ 
+                      withIM (2/10) gimpRightProp $ theLayouts
+    latexLayout     = withIM (2/10) imProp $ Accordion ||| Mirror tiled ||| tiled ||| tabLayout ||| full
+
+    theLayouts      = tiled ||| Mirror tiled ||| tabLayout ||| simpleFloat ||| full
+
+    -- this property will be in the roster slot of imLayout
+    imProp          = Role "buddy_list"
+    gimpLeftProp    = Role "gimp-toolbox"
+    gimpRightProp   = Role "gimp-dock"
+
+    tiled           = hinted (ResizableTall nmaster delta ratio [])
+    tabLayout       = hinted (tabbedBottom shrinkText myTabConfig)
+    twoPane         = hinted (TwoPane delta (1/2))
+    full            = hinted (noBorders Full)
+
+    -- like hintedTile but for any layout
+    hinted l        = layoutHintsWithPlacement (0,0) l
+
+    nmaster         = 1
+    delta           = 2/100
+    ratio           = toRational (2/(1 + sqrt 5 :: Double)) -- golden ratio
+
+-- custom tab bar theme
+myTabConfig :: Theme
+myTabConfig = defaultTheme
+  { fontName            = myXFTFont
+  , decoHeight          = 0
+
+  -- inactive
+  , inactiveColor       = colorBG
+  , inactiveBorderColor = colorFG
+  , inactiveTextColor   = colorFG
+
+  -- active
+  , activeColor         = colorBG
+  , activeBorderColor   = colorFG2
+  , activeTextColor     = colorFG3
+
+  -- urgent
+  , urgentColor         = colorUrg
+  , urgentBorderColor   = colorBG
+  , urgentTextColor     = colorBG
+  }
+
+-- }}}
+
+-- ManageHook {{{
+myManageHook = (composeAll . concat $
+  [ [resource  =? r                 --> doIgnore               |  r    <- myIgnores] -- ignore desktop
+  --, [className =? c                 --> doShift "2-web"        |  c    <- myWebs   ] -- move webs to web
+  --, [title     =? t                 --> doShift "3-chat"       |  t    <- myChatT  ] -- move chats to chat
+  , [resource  =? r                 --> doIgnore               |  r    <- myIgnores] -- move chats to chat
+  , [className =? c                 --> doShift "4-art"        | (c,_) <- myGimpR  ] -- move gimp to art
+  , [role      =? r                 --> (ask >>= doF . W.sink) | (_,r) <- myGimpR  ] -- sink gimp
+  , [className =? c <&&> role /=? r --> doFloat                | (c,r) <- myIM     ] -- float all ims but roster
+  , [className =? c                 --> doCenterFloat          |  c    <- myFloats ] -- float my floats
+  , [name      =? n                 --> doCenterFloat          |  n    <- myNames  ] -- float my names
+  , [isFullscreen                   --> myDoFullFloat                              ]
+  ]) <+> manageTypes <+> manageDocks
+
+  where
+
+    role      = stringProperty "WM_WINDOW_ROLE"
+    name      = stringProperty "WM_NAME"
+
+    -- [("ClassName","Role")]
+    myIM      = [("Pidgin","buddy_list")]
+    myGimpR   = [("Gimp","gimp-image-window"),("Gimp","gimp-toolbox"),("gimp","gimp-dock")]
+
+    -- titles
+    myChatT   = ["irssi"]
+
+    -- classnames
+    myFloats  = ["MPlayer","Squeeze","VirtualBox","Save As...","XFontSel","Xfce4-mixer"]
+    myWebs    = ["Navigator","Shiretoko"]
+
+    -- resources
+    myIgnores = ["desktop","desktop_window"]
+
+    -- names
+    myNames   = ["bashrun","Google Chrome Options"]
+
+-- a trick for fullscreen but stil allow focusing of other WSs
+myDoFullFloat :: ManageHook
+myDoFullFloat = doF W.focusDown <+> doFullFloat
+
+------- manage the scratchpad
+-----manageScratchPad :: ManageHook
+-----manageScratchPad = scratchpadManageHook (W.RationalRect l t w h)
+-----
+-----  where
+-----
+-----    -- height, width as % screensize
+-----    h = 0.4
+-----    w = 0.6
+-----
+-----    -- top center
+-----    t = 0
+-----    l = (1 - w) / 2
+
+-- modified version of manageDocks
+manageTypes :: ManageHook
+manageTypes = checkType --> doCenterFloat
+
+checkType :: Query Bool
+checkType = ask >>= \w -> liftX $ do
+  m   <- getAtom    "_NET_WM_WINDOW_TYPE_MENU"
+  d   <- getAtom    "_NET_WM_WINDOW_TYPE_DIALOG"
+  u   <- getAtom    "_NET_WM_WINDOW_TYPE_UTILITY"
+  mbr <- getProp32s "_NET_WM_WINDOW_TYPE" w
+
+  case mbr of
+    Just [r] -> return $ elem (fromIntegral r) [m,d,u]
+    _        -> return False
+
+-- }}}
+
+-- Status Bars {{{
+--
+-- build two dzen2 bars
+--
+-- for non xft use something like this instead:
+--  
+-- myDzenFont = "-*-terminus-medium-*-*-*-12-*-*-*-*-*-*-*"
+--
+myDzenFont :: String
+--myDzenFont = drop 4 myXFTFont -- strip the 'xft:' part
+myDzenFont = "-*-terminus-medium-*-*-*-12-*-*-*-*-*-*-*"
+
+makeDzen :: Int -> Int -> Int -> Int -> String -> String
+makeDzen x y w h a = "dzen2 -p" ++
+                     " -ta "    ++ a          ++
+                     " -x "     ++ show x     ++
+                     " -y "     ++ show y     ++
+                     " -w "     ++ show w     ++
+                     " -h "     ++ show h     ++
+                     " -fn '"   ++ myDzenFont ++ "'" ++
+                     " -fg '"   ++ colorFG    ++ "'" ++
+                     " -bg '"   ++ colorBG    ++ "' -e 'onstart=lower'"
+
+-- define the bars
+myLeftBar   = makeDzen 0 0 leftBarWidth barHeight "l"
+-----myRightBar  = "conky -c " ++ conkyFile ++ " | " ++ makeDzen leftBarWidth 0 (monitorWidth - leftBarWidth) barHeight "r"
+-- }}}
+
+-- LogHook {{{
+
+myLogHook :: Handle -> X ()
+myLogHook h = (dynamicLogWithPP $ defaultPP
+  { ppCurrent         = dzenColor colorBG  colorFG2 . pad
+  , ppVisible         = dzenColor colorBG  colorFG2 . pad
+  , ppUrgent          = dzenColor colorBG  colorUrg . dzenStrip . pad
+  , ppLayout          = dzenFG    colorFG2 . myRename
+-----  , ppHidden          = dzenFG    colorFG2 . noScratchPad
+  , ppTitle           = shorten 100 
+  , ppHiddenNoWindows = namedOnly
+  , ppSort            = getSortByXineramaRule
+-----  , ppExtras          = [myMail]
+  , ppSep             = " "
+  , ppWsSep           = ""
+  , ppOutput          = hPutStrLn h
+  }) >> updatePointer (Relative 0.95 0.95) -- >> myFadeInactive 0.70
+
+  where
+
+    -- thanks byorgey (this filters out NSP too)
+    namedOnly ws = if any (`elem` ws) ['a'..'z'] then pad ws else ""
+
+    -- my own filter out scratchpad function
+    noScratchPad ws = if ws == "NSP" then "" else pad ws
+
+    -- L needed for loggers
+    dzenFG  c = dzenColor  c ""
+    dzenFGL c = dzenColorL c "" 
+
+-----    myMail    = wrapL "  Mail: " "" . dzenFGL colorFG2 $ maildirNew myMailDir
+-----    myMailDir = "/home/patrick/Mail/GMail/INBOX"
+
+    myRename = (\x -> case x of
+               "Hinted ResizableTall"          -> "  / /-/  "
+               "Mirror Hinted ResizableTall"   -> "  /-,-/  "
+               "Hinted Tabbed Bottom Simplest" -> "  /.../  "
+               "Hinted TwoPane"                -> "  / / /  "
+               "Hinted Full"                   -> "  /   /  "
+               _                               -> "  " ++ x ++ "  "
+               ) . stripIM
+
+    stripIM s = if "IM " `isPrefixOf` s then drop (length "IM ") s else s
+
+-- }}}
+
+-- ModMask {{{
+
+myModMask :: KeyMask
+myModMask = mod4Mask
+
+-- }}}
+
+-- FadeInactive *HACK* {{{
+--
+-- you can probably just use the standard:
+--
+--   >> fadeInactiveLogHook (Ratio)
+--
+-- i use this rewrite that checks layout, because xcompmgr is
+-- epic fail for me on some layouts
+--
+
+-- sets the opacity of inactive windows to the specified amount
+-- *unless* the current layout is full or tabbed
+myFadeInactive :: Rational -> X ()
+myFadeInactive = fadeOutLogHook . fadeIf (isUnfocused <&&> isGoodLayout)
+
+-- returns True if the layout description does not contain words
+-- "Full" or "Tabbed"
+isGoodLayout:: Query Bool
+isGoodLayout = liftX $ do
+  l <- gets (description . W.layout . W.workspace . W.current . windowset)
+  return $ not $ any (`isInfixOf` l) ["Full","Tabbed"] 
+
+-- }}}
+
+-- MySpawnHook *HACK* {{{
+--
+-- spawn an arbitrary command on urgent
+--
+data MySpawnHook = MySpawnHook String deriving (Read, Show)
+
+instance UrgencyHook MySpawnHook where
+    urgencyHook (MySpawnHook s) w = spawn $ s
+
+-- 'ding!' on urgent (gajim has fairly unnannoying sounds thankfully)
+-----myUrgencyHook = MySpawnHook "ossplay -q /usr/share/gajim/data/sounds/message2.wav" 
+myUrgencyHook = MySpawnHook "aplay /usr/share/sounds/purple/alert.wav"
+-- }}}
+
+-- Key Bindings {{{
+--
+-- only those which override/change defaults
+--
+-- watch out for my hijacking of M-S-r (i have but two screens)
+--
+myKeys = [ ("M-S-b"                 , spawn myBrowser          ) -- Open web client
+         , ("M-S-m"                 , spawn myMail             ) -- Open mail client
+         , ("M-S-p"                 , spawn "bashrun"          ) -- Open gmrun replacement
+         , ("M-S-l"                 , spawn "slock"            ) -- Win-shift-l to lock screen
+         -- nonstandard
+-----         , ("M-S-r"                 , spawn myTorrents         ) -- Open/attach rtorrent in screen 
+
+-----         -- custom scripts required (http://pbrisbin.com:8080/scripts.html)
+-----         , ("M-p"                   , spawn "launch.sh"        ) -- dmenu wrapper, sort apps by usage
+-----         , ("M-a"                   , spawn "msearch all"      ) -- Search current playlist via dmenu
+-----         , ("M-g"                   , spawn "goodsong"         ) -- Note current song as 'good'
+-----         , ("M-S-g"                 , spawn "goodsong -p"      ) -- Play a random 'good' song
+-----         , ("M-S-q"                 , spawn "leave"            ) -- Logout via zenity dialog
+-----         , ("<Print>"               , spawn "sshot"            ) -- Take a screenshot on PrintScreen
+
+         -- imports required
+-----         , ("M4-t"                  , scratchPad               ) -- Spawn scratch pad terminal
+         , ("M-`"                   , toggleWS                 ) -- Switch to the most recently vewed ws
+         , ("M-<R>"                 , shiftToNext >> nextWS    ) -- Shift window to ws and follow it
+         , ("M-<L>"                 , shiftToPrev >> prevWS    ) -- Shift window to ws and follow it
+         , ("M-C-k"                 , rotFocusedUp             ) -- Rotate windows up through current focus
+         , ("M-C-j"                 , rotFocusedDown           ) -- Rotate windows down through current focus
+         , ("M-o"                   , sendMessage MirrorShrink ) -- Shink slave panes vertically
+         , ("M-i"                   , sendMessage MirrorExpand ) -- Expand slave panes vertically
+         , ("M-<Backspace>"         , focusUrgent              ) -- Focus most recently urgent window
+         , ("M-S-<Backspace>"       , clearUrgents             ) -- Make urgents go away
+         , ("M-g"                   , withFocused toggleBorder ) -- Toggle border of currently focused window
+         , ("M-r"                   , rotSlavesUp              ) -- rotate slave windows
+
+         -- multimedia: mpd and oss volume
+-----         , ("<XF86AudioPlay>"       , spawn "mpc toggle"       ) -- play/pause mpd
+-----         , ("<XF86AudioStop>"       , spawn "mpc stop"         ) -- stop mpd
+-----         , ("<XF86AudioPrev>"       , spawn "mpc prev"         ) -- prev song
+-----         , ("<XF86AudioNext>"       , spawn "mpc next"         ) -- next song
+-----         , ("<XF86AudioMute>"       , spawn "ossvol -t"        ) -- toggle mute via custom script
+-----         , ("<XF86AudioLowerVolume>", spawn "ossvol -d 1"      ) -- volume down via custom script
+-----         , ("<XF86AudioRaiseVolume>", spawn "ossvol -i 1"      ) -- volume up via custom script
+
+         -- Mod+ to control MPlayer
+-----         , ("M-<XF86AudioPlay>"     , spawn (mPlay "pause"   ) ) -- play/pause mplayer
+-----         , ("M-<XF86AudioStop>"     , spawn (mPlay "stop"    ) ) -- stop mplayer
+-----         , ("M-<XF86AudioPrev>"     , spawn (mPlay "seek -10") ) -- seek back 10 seconds
+-----         , ("M-<XF86AudioNext>"     , spawn (mPlay "seek 10" ) ) -- seek forward 10 seconds
+
+         -- see below
+         , ("M-q"                   , spawn myRestart          ) -- Restart xmonad
+         ]
+
+         where
+
+           -- use myTerminal as the scratchPad terminal
+           scratchPad = scratchpadSpawnActionTerminal myTerminal
+
+           myBrowser  = "firefox"
+           --myBrowser  = "google-chrome"
+           myMail     = "firefox http://gmail.com"
+-----           myIRC      = myScreen "irssi"
+-----           myTorrents = myScreen "rtorrent"
+
+           -- this requires some setup, see my screenrc and bash_exports dotfiles
+           myScreen s = myTerminal ++ " -title "                    ++ s
+                                   ++ " -e bash -cl \"SCREEN_CONF=" ++ s 
+                                   ++ " screen -S "                 ++ s
+                                   ++ " -R -D "                     ++ s 
+                                   ++ "\""
+
+           -- `man mplayer` and ensure that it starts with input = ~/.mplayer_fifo
+           mPlay s    = "echo " ++ s ++ " > $HOME/.mplayer_fifo"
+
+           -- kill all conky/dzen2 before executing default restart command
+           -----myRestart  = "for pid in `pgrep conky`; do kill -9 $pid; done && " ++
+           myRestart  = "for pid in `pgrep dzen2`; do kill -9 $pid; done && " ++
+                        "xmonad --recompile && xmonad --restart"
+
+-- }}}
+
+-- vim:foldmethod=marker
